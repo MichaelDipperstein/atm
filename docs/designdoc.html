@@ -1,0 +1,202 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<HTML>
+<HEAD>
+   <TITLE></TITLE>
+   <META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=iso-8859-1">
+   <META NAME="GENERATOR" CONTENT="Mozilla/3.01Gold (Win95; I) [Netscape]">
+</HEAD>
+<BODY>
+
+<H3 ALIGN=CENTER>ATM Simulation Design Document<BR>
+Kevin O'Gorman<BR>
+Michael Dipperstein<BR>
+CS 274</H3>
+
+<H4>Overview</H4>
+
+<P>The ATM Simulation program will consist of three independent components:
+the User Interface, the Web-Monitor, and the Data Repositories (Bank Branches).
+The components of the ATM Simulation are layered such that the User Interface
+lies on top of the Web-Monitor, which lies on top of the Data Repositories.
+Each component of the ATM Simulation will communicate only with the component
+layered above it and the component layered below it. Each component will
+also be designed so that it may be monitored and debugged through a web
+browser outside of the regular program operation. </P>
+
+<P>To the extent possible, the implementation will observe the WWW paradigm
+of stateless interactions. To this end, there will be no persistent process
+running on behalf of this application. Code will execute only on behalf
+of web page &quot;hits&quot;, and will never intentionally enter an inaccessible
+&quot;wait state&quot;. Persistent state information will be maintained
+as SYSV shared-memory segments with SYSV semaphore mutexes, and by
+the use of HTML hidden fields in the transmitted web pages.</P>
+
+<P>All program components in this project will be implemented in Perl.
+</P>
+
+<H4>User Interface</H4>
+
+<P>The User Interface is responsible for presenting transaction information
+to the ATM Simulation user. It will present the user with transaction options
+and forward requests to the Web-Monitor. The user interface is also responsible
+for receiving updates from the Web-Monitor and displaying them for the
+user. The User Interface will actually be the HTML output of a single Web-Monitor
+CGI script, which will give the user the illusion of separate HTML pages.
+Each Web page may contain one or more hidden fields to identify the
+subject transaction and its persistent state. Communication between the
+User Interface and the user will be through a Web Browser.</P>
+
+<P>The User Interface consists of a single main page, on which the user
+may indicate accounts to be included in the transaction and the actions
+to be taken. There will also be the appearance of other pages for handling
+error conditions. </P>
+
+<P>User input to the main page will consist of account numbers and dollar
+amounts to apply to each account. The page will display identifying
+information about the accounts identified by the user, and the total cash
+(in to teller, out to customer) of the transaction, and status information
+about the transaction. There will be user-selectable buttons to allow the
+user to accept (commit) or abort the transaction. The only valid transaction
+will be a combination of:</P>
+
+<UL>
+<LI>Inquire of an account</LI>
+
+<LI>Deposit to account</LI>
+
+<LI>Withdraw from account</LI>
+
+<LI>Transfer between accounts</LI>
+</UL>
+
+<H4>Web-Monitor</H4>
+
+<P>The Web-Monitor is responsible for maintaining a consistent scheduling
+policy, Data Repository updates, and User Interface updates. The Web-Monitor
+provides an interface that allows only deposit, withdrawal, and transfer
+of money. Account creation and deletion are not provided. The Web-Monitor
+allows inquiry to a number of accounts and money activity among the accounts.
+</P>
+
+<P>The Web-Monitor will interact with the Data Repositories by opening
+a TCP socket to port 80 on www.cs.ucsb.edu, thereby emulating a browser.
+The same effect can be seen by using a UNIX telnet session to the current
+data repository code as follows: </P>
+
+<PRE>   telnet www.cs.ucsb.edu 80
+   GET /cgi-bin/kogorman/bank.pl?bank=0&amp;account=0-0&amp;send=Get HTTP/1.0
+
+followed by two newlines. </PRE>
+
+<P>It is anticipated that the User Interface and the Web Monitor will be
+implemented by separate sections of a single Perl script. </P>
+
+<H5>Scheduling Policy</H5>
+
+<P>Scheduling will be strict 2PL with a &quot;wound/ask&quot; deadlock
+policy. This policy involves timestamping each lock. Timestamps will be
+stored in the form of seconds since epoch. The timestamp will be used to
+enforce a lazy timeout if a lock is held for a small number of minutes.
+When a conflict is detected, one of two cases holds: </P>
+
+<UL>
+<P>(1) if the lock has been held for longer than the allowed duration,
+its transaction will be removed from the list of active transactions, and
+the lock request granted. All locks held by the wounded transaction will
+be released. </P>
+
+<P>(2) if the lock is recent, the user requesting the conflicting lock
+will be asked to try again or elect to abort.</P>
+</UL>
+
+<P>Thus aborts can be either inflicted on a transaction, or selected by
+the user. In the event that a transaction is aborted due to lock timeout,
+the Web-Monitor will notify the User Interface of the wounded transaction
+the next time an operation is submitted for that transaction. This policy
+addresses the very real WWW phenomenon of loss of connection, and
+thus a transaction that will never complete on its own; in this system,
+such transactions will eventually be &quot;wounded&quot; when their expired
+locks cause a conflict, and they will be cleared from the system.</P>
+
+<P>Saved state for the Web-Monitor consists of a transaction list, a lock
+table, and cached values of all pending data updates. Data are not written
+to the persistent database (data repositories) until transaction commit.
+The saved state information is maintained in SYSV shared memory, protected
+by a SYSV semaphore, both with ID 27150. </P>
+
+<H5>Transaction List</H5>
+
+<P>The transaction list contains a next transaction number to assign, and
+a list of active transactions. Any transaction not in the active transaction
+list has either been committed, aborted, or never created. All operations
+by transaction not in the active transaction list will be prohibited.</P>
+
+<P>For each active transaction, a &quot;step number&quot; is maintained
+to prevent a user from using the &quot;back&quot; key on a browser to alter
+the flow of control. This step number encodes sequence of operations and
+the next functional element to be accessed. Any out of sequence operation
+will result in the aborting of the transaction.</P>
+
+<H5>Lock Table</H5>
+
+<P>The lock table is a hash, keyed on account numbers and lock types. Each
+entry contains the account number, the type of lock, the transaction number,
+and the timestamp. The only lock types allowed are read locks and write
+locks. Account inquiries require read locks, while deposits, withdrawals,
+and transfers require write locks. Lock conflicts and their resolution
+is discussed under Scheduling Policy.</P>
+
+<H4>Data Repositories (Bank Branches)</H4>
+
+<P>There will be 10 Data Repositories, simulating 10 bank branches. The
+data for each branch will be implemented as a SYSV shared memory segment.
+Segment IDs 27140-27149 will be arbitrarily assigned to a branch, although
+this is changeable. Access to the data will be protected by a mutex, implemented
+as 10 SYSV semaphores in a single segment numbered 27140. There will be
+one semaphore per bank branch. </P>
+
+<P>A single CGI script will implement interactions with the branch data,
+allowing the following functions: </P>
+
+<UL>
+<LI>Open account</LI>
+
+<LI>Inquire of account</LI>
+
+<LI>Deposit to account</LI>
+
+<LI>Withdraw from account</LI>
+</UL>
+
+<P>These functions will perform basic validity checks and input editing,
+but will impose no scheduling or authentication services. </P>
+
+<P>Bank branches are numbered from 0 to 9, and account numbers contain
+the branch number (as is common with banks). The first account assigned
+to branch 5 will be account 5-0, the second 5-1, and so on. </P>
+
+<P>Branch data consists of the next account number to assign, and account
+information for each account. These are kept in the shared memory as a
+simple text region with a leading binary length field. There is one line
+for the next account number, and one line per account. The line for each
+account comprises four colon-separated fields. The data take the form shown
+below (except that spaces have been added for clarity): </P>
+
+<UL>
+<P>&lt;LENGTH&gt; <BR>
+nextaccount <BR>
+account-number : account-name : account-ssan : account-balance <BR>
+account-number : account-name : account-ssan : account-balance <BR>
+account-number : account-name : account-ssan : account-balance <BR>
+.<BR>
+.<BR>
+.</P>
+</UL>
+
+<P>The account information is not sorted (the lines may appear in any order).
+The hidden fields and the shared-memory segments together comprise all
+the saved state that is preserved between web page hits by the data repositories.
+</P>
+
+</BODY>
+</HTML>

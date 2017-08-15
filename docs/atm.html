@@ -1,0 +1,236 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<HTML>
+<HEAD>
+   <TITLE></TITLE>
+   <META NAME="GENERATOR" CONTENT="Mozilla/3.01Gold (Win95; I) [Netscape]">
+</HEAD>
+<BODY>
+
+<H2 ALIGN=CENTER>A Bank Teller Interface on the Web</H2>
+
+<H3 ALIGN=CENTER>M. Dipperstein&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;K.
+O'Gorman<BR>
+For CS 274, Spring 1998<BR>
+Department of Computer Science<BR>
+University of California Santa Barbara, CA 93106</H3>
+
+<CENTER><P><B>Abstract</B></P></CENTER>
+
+<P>The World Wide Web as implemented in HTML offers great promise and presents
+significant obstacles for distributed database access. This project explores
+some of both. Of particular interest is the HTTP paradigm of connectionless
+and nominally stateless interactions. We decided to stay within the spirit
+of these limitations by using static HTML interactions, driven entirely
+by Perl CGI scripts, and to perform scheduling without any persistent process.
+Transaction state was preserved between HTTP interactions in order to provide
+continuity and to inform the scheduling decisions. The project implements
+an interface for banking transactions against accounts in multiple bank
+branches. Two versions were implemented, one using strict 2PL scheduling,
+and one using the lessons of the first to implement using a more sophisticated
+deadlock resolution scheme and semantic&shy;based scheduler. To varying
+degrees, the two versions deal with correctness, concur&shy; rency, deadlock,
+livelock, and garbage&shy;collection issues, some of which are peculiar
+to the HTTP environment.</P>
+
+<H4>1 The Application</H4>
+
+<P>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;We implemented a bank teller's interface
+to bank branch data, with the ability to enter transactions which involve
+any combination of cash received, deposit or withdrawal to as many as eight
+of the accounts at ten bank branches, and cash returned to a customer.
+The system imposes application consistency constraints on the transaction
+which would be expected in a banking environment.</P>
+
+<H4>2 The Implementations</H4>
+
+<P>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Both the teller interface and the bank
+branches are implemented as web pages, and can be used by e.g. a Netscape
+browser. The human&shy;accessible interface consists of three WWW access
+points: </P>
+
+<UL>
+<LI>A bank branch selector page, with links to each of ten bank branches.
+URL: <A HREF="http://www.cs.ucsb.edu/cgi­bin/kogorman/bank.pl">http://www.cs.ucsb.edu/cgi&shy;bin/kogorman/bank.pl</A></LI>
+
+<LI>The first version of the bank teller interface. URL: <A HREF="http://www.cs.ucsb.edu/cgi­bin/kogorman/atm.pl">http://www.cs.ucsb.edu/cgi&shy;bin/kogorman/atm.pl</A></LI>
+
+<LI>The second version of the bank teller interface. URL: <A HREF="http://www.cs.ucsb.edu/cgi­bin/kogorman/atm2.pl">http://www.cs.ucsb.edu/cgi&shy;bin/kogorman/atm2.pl</A></LI>
+</UL>
+
+<P><I><U>NOTE:</U> Since the authoring, of this paper, the ATM simulator has
+lost its host.  Click <A HREF="../projects.html#atm">here</A> for information
+on obtainig an archive of the simulator.</I></P>
+
+<H4>2.1 Methodology</H4>
+
+<P>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Interaction with the user is entirely
+in standard HTML. The illusion of multiple web pages is provided by the
+use of CGI programming. In fact all pages are produced on the fly by the
+programs.<BR>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;All coding was done in Perl. Frequent reference
+was made to [WCS91] and [Gun96].<BR>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System V IPC implementation required Perl
+versions of system header files. These were produced in two versions, one
+for Linux for use during development and one for Solaris to be used on
+the campus machines. These were created from the system header (.h) files
+by the utility h2ph provided with Perl.<BR>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Some of the CGI interface code was simplified
+by using utility programs provided on the web page for the CGI reference
+[Gun96]. The programs mime.pl and common.pl were obtained from that source.</P>
+
+<H3>2.2 The Constraints</H3>
+
+<P>We chose to work within constraints of standard HTML, and consistent
+with a financial application. The primary constraints imposed by HTML were:</P>
+
+<UL>
+<LI>The several user interactions of a transaction are performed without
+a connection; as a result the application cannot determine if a user has
+become disconnected. Although we were permitted by the problem to assume
+to failures, we considered dropped connections so much a feature of the
+WWW that we treated the problem of a disconnected transaction. We will
+discuss this more completely in Section 2.3.</LI>
+
+<LI>The interactions of HTTP are to a certain extent stateless; in any
+event there is no persistent process waiting for, and timing out for lack
+of, resposes from the user. As a result we used hidden fields in web pages
+to identify a transaction, and kept state information on the transaction
+at the server.</LI>
+
+<LI>The lack of a persistent process prevents the use of true timeouts.
+We used an approach that uses timestamps to achieve much the same effect
+as timeouts.</LI>
+
+<LI>Browsers generally have a &quot;Back&quot; key or something similar.
+This poses problems of synchronization of the user's view of the transaction
+with the saved state. We decided to detect synchronization changes and
+to abort transactions when this was detected.</LI>
+
+<LI>Browsers can send multiple requests when the user presses a button
+multiple times before receiving a reply. This can also cause lost synchronization
+and in all cases where it mattered, we also aborted the transaction.</LI>
+
+<LI>The look&shy;and&shy;feel of the WWW dictates that the server process
+never wait on behalf of a user; some form of reply is sent as soon as possible.
+We chose to observe this discipline, with the result that all waiting is
+done by the user. In the event of a lock conflict, first the deadlock resolution
+methods are tried, and if the conflict persists, the user is given a response
+that indicates that some part of the requested transaction cannot be honored.
+This usually takes the form of a message like &quot;Cannot read lock&quot;
+or &quot;Cannot hold $500.00&quot;.</LI>
+</UL>
+
+<P>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Since our application is dealing with
+dollar amounts and account balances, we imposed constraints suggested by
+this environment:</P>
+
+<UL>
+<LI>No account balance is allowed to be negative.</LI>
+
+<LI>No transaction is allowed to commit while requesting a change that
+would cause an account balance to be negative. </LI>
+
+<LI>The sum of dollars in (cash and checks) plus account activity must
+not be negative, although it can be positive to reflect the normal bank
+practice of allowing partial deposits accompanied by cash back to a customer.</LI>
+</UL>
+
+<H4>2.3 Deadlock and Livelock</H4>
+
+<P>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Both versions of the bank teller interface
+use schedulers that can have deadlock. The two versions use different resolution
+methods, but both rely on timestamps to simulate timeouts. In both versions,
+any acquired lock has a timestamp that is set when the lock is first acquired.
+If the lock becomes older than a systemwide value (currently 3 minutes
+for demonstration purposes), any conflicting lock will assume that deadlock
+has occurred.<BR>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;A variant of &quot;wound&shy;wait&quot; timeout&shy;based
+deadlock detection is used. We call this variation &quot;wound&shy;ask&quot;
+because the user is presented with a page indicating the lock, and providing
+an opportunity to change the transaction, retry the request, or abort.
+The waiting is done in the cycle of user requests to retry, but may be
+resolved in the other indicated ways.<BR>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;In the first version, because of concerns
+mentioned above about disconnected users, any conflict with a lock that
+is older than the system limit (3 minutes) causes the transaction with
+the stale lock to be wounded. In this way, any abandoned or disconnected
+transaction is prevented from deadlocking the entire application. However,
+this approach can in principle lead to livelock, where a transaction is
+repeatedly wounded and never proceeds to completion.<BR>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;In order to deal with this potential livelock,
+the second version uses a timestamp on each transaction to determine which
+is the &quot;older&quot;, and normally only the younger transaction is
+wounded. Since provision is made to restart the wounded transaction with
+the same timestamp, livelock is avoided in this case.</P>
+
+<H4>2.4 Lock Semantics</H4>
+
+<P>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;In the first version, locking is standard
+strict 2PL, with read and write operations, and single account granularity.
+We considered this inconsistent with normal banking practice, which uses
+the concept of a &quot;hold&quot; on part of the balance of an account
+without affecting the remainder of the balance.<BR>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Accordingly, the second version uses only
+increment (deposit) and decrement (withdrawal) operations on the accounts.
+In the absence of the constraints of Section 2.2, this would have allowed
+us to dispense with locks altogether. However, the constraint that account
+balances not be allowed to become negative leads to a requirement to implement
+locks much like the &quot;holds&quot; familiar to bankers. Such locks are
+in effect write&shy;locks on a certain portion of an account, and locks
+conflict when they would amount to more than the committed balance of an
+account.</P>
+
+<H4>3 Saved State</H4>
+
+<P>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;All three application sections use SYSV
+IPC to save state. That is, the each bank branch uses a shared memory segment
+to save accounts and balances, and each of the two teller implementations
+uses a shared memory segment for transaction state. <BR>
+&nbsp;&nbsp;&nbsp;&nbsp;The bank branch data has been alive on the campus
+web server since early May. It has not required rebuilding in that time.
+<BR>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Each shared memory segment was set to a size
+of 10000 bytes, which has been more than adequate for testing.</P>
+
+<H4>4 Garbage Collection</H4>
+
+<P>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The saved state for the teller interface
+may include data for abandoned or disconnected transactions. This became
+a problem for debugging because dumps of the data were getting confusing.
+Accordingly, the second version implements a garbage collector that uses
+an activity timestamp on each transaction in the saved state.<BR>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The result is that any transaction on which
+there has been no progress (no interaction with the user) in a specified
+period will be aborted by the next transaction that does make progress.
+The time limit is set to 15 minutes for demonstration purposes.</P>
+
+<H4>5 Conclusion</H4>
+
+<P>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;We have implemented two versions of the
+banking application. The first, while correct, was primarily a learning
+experience for the team.<BR>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The second version has several improvements
+on the first:</P>
+
+<UL>
+<LI>Livelock&shy;free deadlock resolution through the use of transaction
+timestamps.</LI>
+
+<LI>Increment/decrement semantics for reduced transaction conflict</LI>
+
+<LI>Recovery of wounded transactions without user retyping</LI>
+
+<LI>Garbage collection of saved state</LI>
+</UL>
+
+<H3>References</H3>
+
+<P>[Gun96] Shishir Gundavaram. CGI Programming on the World Wide Web. O'Reilly
+&amp; Associates, Sebastopol, CA, 1996.<BR>
+[WCS91] Larry Wall, Tom Christiansen, and Randal L. Schwartz. Programming
+Perl Second Edition. O'Reilly &amp; Associates, Sebastopol, CA, 1991.</P>
+
+</BODY>
+</HTML>
+<!-- text below generated by server. PLEASE REMOVE --><!-- Counter/Statistics available at http://geocities.yahoo.com --><script language="JavaScript" src="http://us.geocities.com/js_source/geov2.js"></script><script language="javascript">geovisit();</script><noscript><img src="http://visit.geocities.com/visit.gif?1010607902" border=0 width=1 height=1></noscript>
+<IMG SRC="http://geo.yahoo.com/serv?s=46709683&t=1010607902" ALT=1 WIDTH=1 HEIGHT=1>
