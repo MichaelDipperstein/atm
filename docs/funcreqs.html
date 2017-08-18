@@ -1,0 +1,113 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<html><head>
+<meta http-equiv="content-type" content="text/html; charset=windows-1252">
+   <title></title>
+   <meta name="GENERATOR" content="Mozilla/3.01Gold (Win95; I) [Netscape]">
+</head>
+<body>
+
+<h3 align="CENTER">Functional Requirements for<br>
+CS 270 Class Project<br>
+Kevin O'Gorman<br>
+Michael Dipperstein</h3>
+
+<center><p>
+</p><hr width="100%"><p></p></center>
+
+<h4>Overview</h4>
+
+<p>The goal of our project is to provide demonstrate Web-based network
+database transaction. Our project will provide multiple web browser users
+with an interface which allows transactions similar to those provided by
+an Automated Teller Machine (ATM). The maximum number of users will be
+limited by the web server hosting this application, not the application
+itself. The users will be allowed to deposit, withdraw, and transfer balances
+between bank accounts held at different banks. A database of each bank's
+accounts will be stored in independent web accessible databases. The bank
+databases will be hidden from the user of the ATM simulation, but
+may be viewed in by a separate web browser session to verify correctness
+of the simulation.</p>
+
+<h4>Start Up</h4>
+
+<p>The ATM simulation program may be started by opening the simulation's
+home page in a web browser. Upon start up, the user will be presented with
+an informational display and prompted to either request an account balance
+for one or two accounts. To make a balance inquiry, the user must enter
+the account number(s) the balance is desired for and select the Balance
+button on his display. (For this simulation, account numbers will be unique
+between banks, thus eliminating the need for a bank name to be provided
+with the account number.) Making the balance inquiry has the additional
+side effect of an implied begin transaction, therefor a new transaction
+will be started for each entry made form the simulation's home page.</p>
+
+<p>If the balance inquiry successfully returns the account balance(s),
+the user will be allowed to request a deposit, withdrawl, or balance transfer.
+The user will be provided a display with the balance and prompted for the
+next action. If the inquiry fails, the transaction will be aborted. The
+user will be prompted with a failure indication, and then returned to the
+simulation's home page.</p>
+
+<h4>Deposit</h4>
+
+<p>Once a successful balance inquiry has been completed, the user may choose
+to deposit money in the account of the inquiry. To deposit money into the
+account, the user must enter the amount of the deposit and choose the Deposit
+button on his display. The Deposit button will only be presented if the
+user is in a state where deposits are allowed.</p>
+
+<p>Sending the deposit request has the additional side effect of an implied
+end transaction. If the deposit attempt is successful, the user will be
+given a success message and the after deposit account balance. If the deposit
+attempt is not successful, the user will be informed of the failure and
+returned to the home page.</p>
+
+<h4>Withdrawl</h4>
+
+<p>Once a successful balance inquiry has been completed, the user may choose
+to withdraw money from the account of the inquiry. To withdraw money from
+the account, the user must enter the amount of the withdrawl and choose
+the Withdraw button on his display. The Withdrawl button will only be presented
+if the user is in a state where withdrawals are allowed.</p>
+
+<p>Sending the withdrawl request has the additional side effect of an implied
+end transaction. If the withdrawl attempt is successful, the user will
+be given a success message and the after withdrawl account balance. If
+the withdrawl attempt is not successful, the user will be informed of the
+failure and returned to the home page. A withdrawl request which would
+cause a balance to go negative will not be allowed to succeed.</p>
+
+<h4>Transfer</h4>
+
+<p>Once a successful balance inquiry has been completed for two accounts,
+the user may choose to transfer money from the first account of the inquiry
+to the second. To transfer money from the first account, the user must
+enter the amount of the transfer and choose the Transfer button on his
+display. The Transfer button will only be presented if the user is in a
+state where transfers are allowed.</p>
+
+<p>Sending the transfer request has the additional side effect of an implied
+end transaction. If the transfer attempt is successful, the user will be
+given a success message and the after transfer account balance of both
+accounts. If the withdrawl attempt is not successful, the user will be
+informed of the failure and returned to the home page. A transfer request
+which would cause a balance of the account transferred from to go negative
+will not be allowed to succeed. It is not necessary for the accounts involve
+in the transfer to belong to the same bank in order for the transfer to
+succeed.</p>
+
+<h4>Aborting Transaction</h4>
+
+<p>The user my abort a transaction by pressing the Abort button on his
+display. A transaction may be aborted by the user anytime between starting
+up and sending a deposit, withdrawl, or transfer request. These operations
+may not be aborted once they are forwarded to the transaction manager since
+they contain implied commits. Once a transaction is aborted the user will
+be transitioned back to the start up display where he may choose to start
+begin another transaction or perform another action with his web browser.</p>
+
+<p><br>
+</p>
+
+
+</body></html>
